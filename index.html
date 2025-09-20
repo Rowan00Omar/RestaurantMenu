@@ -35,8 +35,8 @@
     /* container */
     .wrap {
       max-width: 900px;
-      margin: 24px auto;
-      padding: 28px 30px 30px 30px;
+      margin: 10px auto;
+      padding: 28px 20px 30px 20px;
       box-sizing: border-box;
     }
 
@@ -263,9 +263,113 @@
         gap: 12px;
       }
 
-      #orderSummary .inner{
+      #orderSummary .inner {
         flex-direction: column;
       }
+
+      #adminHeader {
+        flex-direction: column;
+
+      }
+    }
+
+    /* QR Code Popup Styles */
+    .qr-popup-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .qr-popup-overlay.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .qr-popup-content {
+      background: var(--bg);
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      position: relative;
+      color: var(--text);
+    }
+
+    .qr-popup-content h3 {
+      margin-top: 0;
+      color: var(--accent);
+    }
+
+    .qr-popup-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .qr-popup-close:hover {
+      color: var(--accent);
+    }
+
+    /* Admin QR Scan Popup Styles */
+    #adminQrScannerPopup .qr-popup-content {
+      max-width: 500px;
+      width: 90%;
+    }
+
+    #adminQrScannerPopup button {
+      margin: 5px;
+    }
+
+    #qrScannerCamera {
+      width: 100%;
+      height: 300px;
+      background: #333;
+      border-radius: 8px;
+      margin-top: 10px;
+      display: none;
+      /* Hidden by default */
+    }
+
+    #scannedOrderDetails,
+    #tableNumberPrompt {
+      margin-top: 20px;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      text-align: left;
+      display: none;
+    }
+
+    #scannedOrderDetails h4,
+    #scannedOrderDetails h5 {
+      margin-top: 0;
+      color: var(--accent);
+    }
+
+    #tableNumberPrompt input[type="text"] {
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background: #0b0b0b;
+      color: var(--text);
+      width: calc(100% - 20px);
+      margin-top: 10px;
     }
   </style>
 </head>
@@ -293,6 +397,43 @@
     <div id="qrcode" style="max-width: 920px; margin: 10px auto 0; display: none"></div>
   </div>
 
+  <!-- QR Code Popup -->
+  <div id="qrCodePopup" class="qr-popup-overlay">
+    <div class="qr-popup-content">
+      <button class="qr-popup-close" id="closeQrPopup">&times;</button>
+      <h3>Your Order QR Code</h3>
+      <div style="padding:16px; background:#fff; display:inline-block">
+
+        <div id="popupQrCodeCanvas"></div>
+      </div>
+      <p>
+        <button id="copyOrderIdBtn" class="btn secondary">Copy Order ID</button>
+      </p>
+    </div>
+  </div>
+
+  <!-- Admin QR Code Scan Popup -->
+  <div id="adminQrScannerPopup" class="qr-popup-overlay">
+    <div class="qr-popup-content">
+      <button class="qr-popup-close" id="closeAdminQrScannerPopup">&times;</button>
+      <h3>Scan Order QR Code</h3>
+      <p>Scan a QR code using your camera or upload an image.</p>
+      <div>
+        <input type="file" accept="image/*" id="qrCodeImageInput" style="display: none;" />
+        <button id="uploadQrImageBtn" class="btn secondary">Upload QR Image</button>
+        <button id="startCameraScanBtn" class="btn green">Start Camera Scan</button>
+        <button id="stopCameraScanBtn" class="btn secondary" style="display: none;">Stop Camera Scan</button>
+      </div>
+      <div id="qrScannerCamera"></div>
+      <div id="scannedOrderDetails"></div>
+      <div id="tableNumberPrompt">
+        <p>Enter Table Number for Order:</p>
+        <input type="text" id="tableNumberInput" placeholder="Table Number" />
+        <button id="assignTableBtn" class="btn green">Assign to Table</button>
+      </div>
+    </div>
+  </div>
+
   <!-- scripts -->
 
   <script src="./firebase.js" type="module"></script>
@@ -302,7 +443,7 @@
 
   <script type="module">
     import { renderMenu } from './menu.js';
-    import { showAdminPanel } from './admin.js';
+    import { showAdminLogin } from './admin.js';
 
     function router() {
       console.log(location.hash);
@@ -314,12 +455,13 @@
         renderMenu(); // from menu.js
       } else if (hash.startsWith("#/admin/")) {
         const restaurantId = hash.split("/")[2];
-        showAdminPanel(restaurantId); // from admin.js
+        showAdminLogin(restaurantId); // from admin.js
       }
     }
 
     // Run once and on hash change
     window.addEventListener("hashchange", router);
+    window.addEventListener("load", router);
   </script>
 </body>
 

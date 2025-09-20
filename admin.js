@@ -3,7 +3,7 @@
 // Use demo password stored in DB (adminPassword). For production, replace with real auth.
 
 import { DB } from './db.js';
-const restaurantId = "demo-restaurant";
+let restaurantId;  //="demo-restaurant";
 const wrap = document.getElementById("wrap");
 // Import formatPrice from menu.js
 import { formatPrice } from './menu.js';
@@ -16,17 +16,21 @@ import { menuStructure } from './menu.js';
 
 // })();
 
-async function showAdminLogin() {
+export async function showAdminLogin(restId) {
+  restaurantId = restId
   wrap.innerHTML = await loadTemplate('./templates/admin-login.html');
   document.getElementById("backHome").onclick = () => {
     location.hash = "";
     location.reload();
   };
-  document.getElementById("adminEnter").onclick = tryEnter;
+  document.getElementById("adminEnter").onclick = () => {
+    tryEnter(restaurantId);
+  };
 }
 
-async function tryEnter() {
+async function tryEnter(restaurantId) {
   const pass = document.getElementById("adminPass").value;
+  console.log(restaurantId)
   const doc = DB.data[restaurantId];
   if (!doc) {
     alert("Restaurant not found");
@@ -39,7 +43,7 @@ async function tryEnter() {
   showAdminPanel();
 }
 
-export function showAdminPanel(restaurantId) {
+function showAdminPanel() {
   // Listen to live menu
   DB.onSnapshot(restaurantId, (doc) => {
     const data = doc.data();
@@ -60,17 +64,16 @@ async function renderAdmin(data) {
   menuStructure.forEach((key) => {
     const section = menu[key]; // Get section data based on ordered key
     if (!section) return; // Skip if section does not exist in data
-    
+
     const itemsHtml = Array.from(section.items)
       .map((it) => {
         return `<div style="display:flex;justify-content:space-between;gap:12px;padding:10px;border-bottom:1px dashed rgba(255,255,255,0.04);align-items:center">
                   <div style="min-width:180px">
                     <div style="font-weight:700">${it.name}</div>
-                    ${
-                      it.desc
-                        ? `<div style="color:var(--muted)">${it.desc}</div>`
-                        : ""
-                    }
+                    ${it.desc
+            ? `<div style="color:var(--muted)">${it.desc}</div>`
+            : ""
+          }
                   </div>
                   <div style="display:flex;gap:8px;align-items:center">
                     <input type="number" min="0" step="1" value="${it.price
@@ -258,76 +261,138 @@ async function fetchAndDisplayOrder(orderId, displayDiv) {
 
 let html5QrCode = null;
 
-async function initQrScanner() {
-  const qrScannerDiv = document.getElementById('qrScanner');
-  const startScanBtn = document.getElementById('startQrScan');
-  const stopScanBtn = document.getElementById('stopQrScan');
+async function initAdminQrScannerLogic() {
+  const adminQrScannerPopup = document.getElementById('adminQrScannerPopup');
+  const closeAdminQrScannerPopup = document.getElementById('closeAdminQrScannerPopup');
+  const qrScannerCameraDiv = document.getElementById('qrScannerCamera');
+  const startCameraScanBtn = document.getElementById('startCameraScanBtn');
+  const stopCameraScanBtn = document.getElementById('stopCameraScanBtn');
+  const uploadQrImageBtn = document.getElementById('uploadQrImageBtn');
+  const qrCodeImageInput = document.getElementById('qrCodeImageInput');
   const scannedOrderDetailsDiv = document.getElementById('scannedOrderDetails');
   const tableNumberPromptDiv = document.getElementById('tableNumberPrompt');
   const tableNumberInput = document.getElementById('tableNumberInput');
-  const assignTableBtn = document.getElementById('assignTable');
+  const assignTableBtn = document.getElementById('assignTableBtn');
 
-  startScanBtn.onclick = () => {
-    qrScannerDiv.style.display = 'block';
-    startScanBtn.style.display = 'none';
-    stopScanBtn.style.display = 'inline-block';
+  let html5QrCode = null;
+  let currentOrderId = null;
 
-    html5QrCode = new Html5Qrcode("qrScanner");
+  closeAdminQrScannerPopup.onclick = () => {
+    stopQrScanning();
+    adminQrScannerPopup.classList.remove('show');
+    // Clear content when closing
+    scannedOrderDetailsDiv.innerHTML = '';
+  };
+
+  startCameraScanBtn.onclick = () => {
+    qrScannerCameraDiv.style.display = 'block';
+    startCameraScanBtn.style.display = 'none';
+    stopCameraScanBtn.style.display = 'inline-block';
+    scannedOrderDetailsDiv.style.display = 'none';
+    tableNumberPromptDiv.style.display = 'none';
+
+    html5QrCode = new Html5Qrcode("qrScannerCamera");
     html5QrCode.start(
       { facingMode: "environment" },
       (decodedText, decodedResult) => {
-        // on scan success
         console.log(`QR Code detected: ${decodedText}`);
-        stopQrScanning();
-        
-        let orderId = decodedText;
-        if (decodedText.startsWith("order:")) {
-          orderId = decodedText.substring(6);
-        }
-
-        fetchAndDisplayOrder(orderId, scannedOrderDetailsDiv);
-
-        tableNumberPromptDiv.style.display = 'block';
-        assignTableBtn.onclick = async () => {
-          const tableNumber = tableNumberInput.value.trim();
-          if (!tableNumber) {
-            alert("Please enter a table number.");
-            return;
-          }
-
-          // Update order in Firestore with table number and status
-          const orderDocRef = doc(db, "orders", orderId);
-          await updateDoc(orderDocRef, { tableNumber: tableNumber, status: "received" });
-          alert(`Order ${orderId} assigned to table ${tableNumber} and marked as received!`);
-          tableNumberInput.value = '';
-          tableNumberPromptDiv.style.display = 'none';
-          fetchAndDisplayOrder(orderId, scannedOrderDetailsDiv); // Re-fetch to update display
-        };
+        handleDecodedQrCode(decodedText);
       },
       (errorMessage) => {
-        // on error
         console.warn(`QR Code scanning error: ${errorMessage}`);
       }
     ).catch((err) => {
       console.error("Unable to start QR code scanner.", err);
-      scannedOrderDetailsDiv.innerHTML = `<span style="color:red;">Error starting scanner: ${err}</span>`;
+      scannedOrderDetailsDiv.innerHTML = `<span style="color:red;">Error starting camera: ${err}</span>`;
+      scannedOrderDetailsDiv.style.display = 'block';
       stopQrScanning();
     });
   };
 
-  stopScanBtn.onclick = () => {
+  stopCameraScanBtn.onclick = () => {
     stopQrScanning();
+  };
+
+  uploadQrImageBtn.onclick = () => {
+    html5QrCode = new Html5Qrcode("qrScannerCamera");
+
+    qrCodeImageInput.click(); // Trigger file input click
+  };
+
+  qrCodeImageInput.onchange = (e) => {
+    if (e.target.files.length > 0) {
+      const imageFile = e.target.files[0];
+      if (html5QrCode) {
+        html5QrCode.scanFile(imageFile)
+          .then(decodedText => {
+            console.log(`QR Code from image: ${decodedText}`);
+            handleDecodedQrCode(decodedText);
+          })
+          .catch(err => {
+            console.error("Error scanning image: ", err);
+            scannedOrderDetailsDiv.innerHTML = `<span style="color:red;">Error scanning image: ${err}</span>`;
+            scannedOrderDetailsDiv.style.display = 'block';
+          });
+      } else {
+        scannedOrderDetailsDiv.innerHTML = `<span style="color:red;">Scanner not initialized. Try starting camera first.</span>`;
+        scannedOrderDetailsDiv.style.display = 'block';
+      }
+      closeAdminQrScannerPopup.click();
+    }
+  };
+
+  assignTableBtn.onclick = async () => {
+    if (!currentOrderId) {
+      alert("No order scanned to assign.");
+      return;
+    }
+    const tableNumber = tableNumberInput.value.trim();
+    if (!tableNumber) {
+      alert("Please enter a table number.");
+      return;
+    }
+
+    // Update order in Firestore with table number and status
+    const orderDocRef = doc(db, "orders", currentOrderId);
+    await updateDoc(orderDocRef, { tableNumber: tableNumber, status: "received" });
+    alert(`Order ${currentOrderId} assigned to table ${tableNumber} and marked as received!`);
+    tableNumberInput.value = '';
+    tableNumberPromptDiv.style.display = 'none';
+    fetchAndDisplayOrder(currentOrderId, scannedOrderDetailsDiv); // Re-fetch to update display
   };
 
   function stopQrScanning() {
     if (html5QrCode) {
       html5QrCode.stop().then(() => {
-        qrScannerDiv.style.display = 'none';
-        startScanBtn.style.display = 'inline-block';
-        stopScanBtn.style.display = 'none';
+        qrScannerCameraDiv.style.display = 'none';
+        startCameraScanBtn.style.display = 'inline-block';
+        stopCameraScanBtn.style.display = 'none';
+        html5QrCode.clear(); // Clear the camera feed and resources
       }).catch((err) => {
         console.error("Error stopping QR scanner", err);
       });
+    }
+  }
+
+  async function handleDecodedQrCode(decodedText) {
+    stopQrScanning(); // Stop camera after successful scan
+
+    let orderId = decodedText;
+    if (decodedText.startsWith("order:")) {
+      orderId = decodedText.substring(6);
+    }
+    currentOrderId = orderId;
+
+    scannedOrderDetailsDiv.style.display = 'block';
+    await fetchAndDisplayOrder(orderId, scannedOrderDetailsDiv);
+
+    // Only show table number prompt if order is pending
+    const orderDocRef = doc(db, "orders", orderId);
+    const orderDocSnap = await getDoc(orderDocRef);
+    if (orderDocSnap.exists() && orderDocSnap.data().status === "pending") {
+      tableNumberPromptDiv.style.display = 'block';
+    } else {
+      tableNumberPromptDiv.style.display = 'none';
     }
   }
 }
@@ -336,5 +401,15 @@ async function initQrScanner() {
 const originalRenderAdmin = renderAdmin;
 renderAdmin = async (data) => {
   await originalRenderAdmin(data);
-  initQrScanner();
+  document.getElementById('openAdminQrScanner').onclick = () => {
+    document.getElementById('adminQrScannerPopup').classList.add('show');
+    // Reset state when opening popup
+    document.getElementById('qrScannerCamera').style.display = 'none';
+    document.getElementById('startCameraScanBtn').style.display = 'inline-block';
+    document.getElementById('stopCameraScanBtn').style.display = 'none';
+    document.getElementById('scannedOrderDetails').style.display = 'none';
+    document.getElementById('tableNumberPrompt').style.display = 'none';
+    document.getElementById('qrCodeImageInput').value = ''; // Clear file input
+  };
+  initAdminQrScannerLogic(); // Initialize the new scanner logic
 };

@@ -45,21 +45,21 @@ export async function renderMenu() {
     if (!section) return;
 
     let sectionHtml = '';
-    if (key === "sides") {
-      const items = Array.from(section.items)
-        .map((it) => {
-          return `<li style="display:flex;justify-content:space-between;padding:4px 0">
-                  <span>${it.name}</span>
-                  <span class="${it.available ? "" : "unavailable"
-            }">${formatPrice(it.price)}</span>
-                </li>`;
-        })
-        .join("");
-      sectionHtml = `<div>
-                      <h3 class="section-title">${section.name}</h3>
-                      <ul class="small-list">${items}</ul>
-                    </div>`;
-    } else {
+    // if (key === "sides") {
+    //   const items = Array.from(section.items)
+    //     .map((it) => {
+    //       return `<li style="display:flex;justify-content:space-between;padding:4px 0">
+    //               <span>${it.name}</span>
+    //               <span class="${it.available ? "" : "unavailable"
+    //         }">${formatPrice(it.price)}</span>
+    //             </li>`;
+    //     })
+    //     .join("");
+    //   sectionHtml = `<div>
+    //                   <h3 class="section-title">${section.name}</h3>
+    //                   <ul class="small-list">${items}</ul>
+    //                 </div>`;
+    // } else {
       const itemsHtml = Array.from(section.items)
         .map((it) => {
           const classes = it.available ? "available" : "unavailable";
@@ -81,7 +81,7 @@ export async function renderMenu() {
                       <h3 class="section-title">${section.name}</h3>
                       <div class="menu-list">${itemsHtml}</div>
                     </div>`;
-    }
+    // }
     document.getElementById(`${key}Section`).innerHTML = sectionHtml;
   });
 
@@ -173,30 +173,39 @@ async function generateQr() {
   try {
     const docRef = await addDoc(collection(db, "orders"), orderPayload);
     const orderId = docRef.id;
-    clearCart(); // Clear cart after placing order
+    // clearCart(); // Clear cart after placing order
 
-    const qrData = `order:${orderId}`;
-    // Get the element where the QR code will be displayed
-    const qrElement = document.getElementById('qrcode');
+    const qrData = `order://${orderId}`;
 
-    // // Define the data for the QR code
-    // const qrData = 'https://www.example.com'; // Replace with your desired URL or text
+    const qrCodePopup = document.getElementById('qrCodePopup');
+    const popupQrCodeCanvas = document.getElementById('popupQrCodeCanvas');
+    const copyOrderIdBtn = document.getElementById('copyOrderIdBtn');
 
-    // Create a new QRCode instance
-    const qrcode = new QRCode(qrElement, {
+    // Clear any existing QR code
+    popupQrCodeCanvas.innerHTML = '';
+
+    // Generate the new QR code
+    new QRCode(popupQrCodeCanvas, {
       text: qrData,
-      width: 128,
-      height: 128,
-      colorDark: '#000000', // Dark color for the QR code modules
-      colorLight: '#ffffff', // Light color for the background
-      correctLevel: QRCode.CorrectLevel.H // Error correction level (L, M, Q, H)
+      width: 240,
+      height: 240,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
     });
 
-    // If you need to generate a new QR code with different data later,
-    // you can use the makeCode method:
-    qrcode.makeCode('New QR code data');
+    copyOrderIdBtn.onclick = () => {
+      navigator.clipboard.writeText(orderId).then(() => {
+        copyOrderIdBtn.textContent = 'Copied!';
+        setTimeout(() => {
+          copyOrderIdBtn.textContent = 'Copy Order ID';
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy Order ID: ', err);
+      });
+    };
 
-    // const qrPanel = document.getElementById("qrPanel");
+     // const qrPanel = document.getElementById("qrPanel");
     // qrPanel.style.display = "block";
     // qrPanel.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;align-items:center">
     //                         <div id="qrCanvas"></div>
@@ -208,18 +217,17 @@ async function generateQr() {
     // window.QRCode.toCanvas(canvas, qrData, { width: 160, margin: 2 }, () => {
     //   canvasWrap.appendChild(canvas);
     // });
+    
+    qrCodePopup.classList.add('show');
 
-    // document.getElementById("copyOrderId").onclick = async () => {
-    //   try {
-    //     await navigator.clipboard.writeText(orderId);
-    //     alert("Order ID copied to clipboard");
-    //   } catch (e) {
-    //     alert("Copy failed");
-    //   }
-    // };
+    // Clear cart after order is placed and QR code is shown
+    cart = {};
+    renderCart();
+    console.log("Cart cleared.");
+
   } catch (e) {
     console.error("Error placing order: ", e);
-    alert("Failed to place order. Please try again.");
+    alert("Error placing order. Please try again.");
   }
 }
 
@@ -246,6 +254,12 @@ document.addEventListener("click", (e) => {
   if (e.target && e.target.id === "generateQr") {
     generateQr();
   }
+});
+
+// Event listener for closing the QR code popup
+document.getElementById('closeQrPopup').addEventListener('click', () => {
+  document.getElementById('qrCodePopup').classList.remove('show');
+  document.getElementById('popupQrCodeCanvas').innerHTML = ''; // Clear QR code
 });
 
 // listen DB for live updates
