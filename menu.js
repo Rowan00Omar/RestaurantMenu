@@ -2,7 +2,13 @@
 // Renders the printed-style menu using data from MockDB
 // Handles order cart, sticky footer, QR generation
 
-import { DB } from './db.js';
+import { DB } from "./db.js";
+import { db } from "./firebase.js"; // Import the Firestore db instance
+import {
+  collection,
+  addDoc,
+} from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { loadTemplate } from './templateLoader.js';
 const restaurantId = "demo-restaurant";
 const wrap = document.getElementById("wrap");
 
@@ -21,138 +27,73 @@ export function formatPrice(v) {
   return Number(v).toFixed(2);
 }
 
+export const menuStructure = ["starters", "mains", "sides", "desserts", "drinks"];
+
 // Build main template (header + columns)
-export function renderMenu() {
+export async function renderMenu() {
   if (!menuData) return;
   const doc = menuData;
-  // header images: we'll use two images similar to screenshot (replace links as desired)
-  const headerImgLeft =
-    "https://images.unsplash.com/photo-1553177591-7c7b28a5a8a0?auto=format&fit=crop&w=800&q=60";
-  const headerImgRight =
-    "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=800&q=60";
 
-  // categories order to match screenshot: starters,mains,sides,desserts,drinks
-  const order = ["starters", "mains", "sides", "desserts", "drinks"];
-  const sections = order
-    .map((key) => {
-      const section = doc.menu[key];
-      if (!section) return "";
-      // For sides list (small format) we render differently
-      if (key === "sides") {
-        const items = Object.values(section.items)
-          .map((it) => {
-            return `<li style="display:flex;justify-content:space-between;padding:4px 0">
-                    <span>${it.name}</span>
-                    <span class="${
-                      it.available ? "" : "unavailable"
-                    }">${formatPrice(it.price)}</span>
-                  </li>`;
-          })
-          .join("");
-        return `<div>
-                  <h3 class="section-title">${section.name}</h3>
-                  <ul class="small-list">${items}</ul>
-                </div>`;
-      }
+  wrap.innerHTML = await loadTemplate('./templates/menu.html');
 
-      // normal section with descriptions
-      const itemsHtml = Object.values(section.items)
+  document.getElementById('headerImgLeft').src = "https://images.unsplash.com/photo-1424847651672-bf20a4b0982b?auto=format&fit=crop&w=800&q=60";
+  document.getElementById('headerImgRight').src = "https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=800&q=60";
+
+
+  menuStructure.forEach((key) => {
+    const section = doc.menu[key];
+    if (!section) return;
+
+    let sectionHtml = '';
+    if (key === "sides") {
+      const items = Array.from(section.items)
         .map((it) => {
-          const classes = it.available ? "available" : "unavailable";
-          // clickable -> data attributes
-          return `<div class="menu-item ${classes}" data-id="${
-            it.id
-          }" data-section="${key}" ${
-            it.available ? "" : 'aria-disabled="true"'
-          } onclick="window.__menuClick && window.__menuClick('${key}','${
-            it.id
-          }')">
-                  <div class="left">
-                    <div style="font-weight:700">${it.name}</div>
-                    ${it.desc ? `<div class="desc">${it.desc}</div>` : ""}
-                  </div>
-                  <div class="right leader">
-                    <div class="dots" aria-hidden></div>
-                    <div class="${classes}">$${formatPrice(it.price)}</div>
-                  </div>
-                </div>`;
+          return `<li style="display:flex;justify-content:space-between;padding:4px 0">
+                  <span>${it.name}</span>
+                  <span class="${it.available ? "" : "unavailable"
+            }">${formatPrice(it.price)}</span>
+                </li>`;
         })
         .join("");
+      sectionHtml = `<div>
+                      <h3 class="section-title">${section.name}</h3>
+                      <ul class="small-list">${items}</ul>
+                    </div>`;
+    } else {
+      const itemsHtml = Array.from(section.items)
+        .map((it) => {
+          const classes = it.available ? "available" : "unavailable";
+          return `<div class="menu-item ${classes}" data-id="${it.id
+            }" data-section="${key}" ${it.available ? "" : 'aria-disabled="true"'
+            } onclick="window.__menuClick && window.__menuClick('${key}','${it.id}')">
+                        <div class="left">
+                          <div style="font-weight:700">${it.name}</div>
+                          ${it.desc ? `<div class="desc">${it.desc}</div>` : ""}
+                        </div>
+                        <div class="right leader">
+                          <div class="dots" aria-hidden></div>
+                          <div class="${classes}">$${formatPrice(it.price)}</div>
+                        </div>
+                      </div>`;
+        })
+        .join("");
+      sectionHtml = `<div>
+                      <h3 class="section-title">${section.name}</h3>
+                      <div class="menu-list">${itemsHtml}</div>
+                    </div>`;
+    }
+    document.getElementById(`${key}Section`).innerHTML = sectionHtml;
+  });
 
-      return `<div>
-                <h3 class="section-title">${section.name}</h3>
-                <div class="menu-list">${itemsHtml}</div>
-              </div>`;
-    })
-    .join("");
-
-  // Compose final layout: header + two columns (left contains starters + sides + desserts, right contains mains + drinks and images)
-  // We'll distribute sections to mimic the screenshot
-  const html = `
-      <div class="brand">
-        <div class="title-box">
-          <h2 style="font-size:18px;margin-bottom:8px">RICARDO'S</h2>
-          <h1>MENU</h1>
-        </div>
-        <div class="img-box"><img src="${headerImgRight}" alt="dish"/></div>
-      </div>
-
-      <div class="columns">
-        <div>
-          <!-- Left column: Starters + Sides + Desserts -->
-          ${renderSectionByKey("starters")}
-          ${renderSectionByKey("sides")}
-          ${renderSectionByKey("desserts")}
-        </div>
-        <div>
-          <!-- Right column: Mains + image + Drinks -->
-          ${renderSectionByKey("mains")}
-          <div style="margin-top:10px" class="img-box"><img src="${headerImgLeft}" alt="pasta"/></div>
-          ${renderSectionByKey("drinks")}
-        </div>
-      </div>
-    `;
-
-  wrap.innerHTML = html;
-  // hook click handler
   window.__menuClick = (sectionId, itemId) => {
     addToCart(sectionId, itemId);
   };
-}
-
-// helper to render a specific section (used above)
-function renderSectionByKey(key) {
-  const sec = menuData.menu[key];
-  if (!sec) return "";
-  //   const items = Object.values(sec.items).map(it => `<li style="display:flex;justify-content:space-between;padding:4px 0"><span>${it.name}</span><span class="${it.available? '': 'unavailable'}">${formatPrice(it.price)}</span></li>`).join("");
-  //   return `<h3 class="section-title">${sec.name}</h3><ul class="small-list">${items}</ul>`;
-  // } else {
-  const itemsHtml = Object.values(sec.items)
-    .map((it) => {
-      const classes = it.available ? "available" : "unavailable";
-      return `<div class="menu-item ${classes}" data-id="${
-        it.id
-      }" data-section="${key}" ${
-        it.available ? "" : 'aria-disabled="true"'
-      } onclick="window.__menuClick && window.__menuClick('${key}','${it.id}')">
-                  <div class="left">
-                    <div style="font-weight:700">${it.name}</div>
-                    ${it.desc ? `<div class="desc">${it.desc}</div>` : ""}
-                  </div>
-                  <div class="right leader">
-                    <div class="dots" aria-hidden></div>
-                    <div class="${classes}">$${formatPrice(it.price)}</div>
-                  </div>
-                </div>`;
-    })
-    .join("");
-  return `<h3 class="section-title">${sec.name}</h3><div class="menu-list">${itemsHtml}</div>`;
-  // }
+  updateWrapPadding(); // Initial padding update
 }
 
 // Cart functions
 function addToCart(sectionId, itemId) {
-  const item = menuData.menu[sectionId].items[itemId];
+  const item = menuData.menu[sectionId].items.find(it => it.id === itemId);
   if (!item || !item.available) return;
   if (!cart[itemId]) cart[itemId] = { ...item, qty: 0 };
   cart[itemId].qty++;
@@ -173,13 +114,14 @@ function renderCart() {
   const orderSummary = document.getElementById("orderSummary");
   const orderItems = document.getElementById("orderItems");
   const orderTotal = document.getElementById("orderTotal");
-  const qrPanel = document.getElementById("qrPanel");
-  qrPanel.style.display = "none";
-  qrPanel.innerHTML = "";
+  // const qrPanel = document.getElementById("qrPanel");
+  // qrPanel.style.display = "none";
+  // qrPanel.innerHTML = "";
 
   const keys = Object.keys(cart);
   if (keys.length === 0) {
     orderSummary.style.display = "none";
+    updateWrapPadding(); // Update padding when cart is empty
     return;
   }
   orderSummary.style.display = "block";
@@ -187,12 +129,11 @@ function renderCart() {
     .map((k) => {
       const it = cart[k];
       return `<div style="display:flex;gap:8px;align-items:center">
-                <div style="min-width:220px">${
-                  it.name
-                } <span style="color:var(--muted)">x${it.qty}</span></div>
+                <div style="min-width:220px">${it.name
+        } <span style="color:var(--muted)">x${it.qty}</span></div>
                 <div style="font-weight:700">$${formatPrice(
-                  it.price * it.qty
-                )}</div>
+          it.price * it.qty
+        )}</div>
                 <div style="margin-left:8px"><button data-id="${k}" class="btn secondary small-btn" onclick="window.__removeOne('${k}')">−</button></div>
               </div>`;
     })
@@ -206,50 +147,95 @@ function renderCart() {
   window.__removeOne = function (id) {
     removeOne(id);
   };
-}
-
-// build order link (encode order JSON in fragment - demo ONLY)
-function buildOrderUrl() {
-  const items = Object.values(cart).map((it) => ({
-    id: it.id,
-    name: it.name,
-    price: it.price,
-    qty: it.qty,
-  }));
-  const payload = {
-    restaurantId,
-    createdAt: new Date().toISOString(),
-    items,
-    total: items.reduce((s, i) => s + i.price * i.qty, 0),
-  };
-  const json = JSON.stringify(payload);
-  const encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(json))));
-  return `${location.origin}${location.pathname}#order=${encoded}`;
+  updateWrapPadding(); // Update padding after cart is rendered
 }
 
 // generate QR and show link
-function generateQr() {
-  const url = buildOrderUrl();
-  const qrPanel = document.getElementById("qrPanel");
-  qrPanel.style.display = "block";
-  qrPanel.innerHTML = `<div style="display:flex;gap:12px;align-items:center">
-                          <div id="qrCanvas"></div>
-                          <div style="color:var(--muted);word-break:break-all">${url}<div style="margin-top:6px"><button id="copyLink" class="btn secondary">Copy link</button></div></div>
-                        </div>`;
-  const canvasWrap = document.getElementById("qrCanvas");
-  const canvas = document.createElement("canvas");
-  QRCode.toCanvas(canvas, url, { width: 160, margin: 2 }, () => {
-    canvasWrap.appendChild(canvas);
-  });
+async function generateQr() {
+  if (Object.keys(cart).length === 0) {
+    alert("Your cart is empty!");
+    return;
+  }
 
-  document.getElementById("copyLink").onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      alert("Link copied to clipboard");
-    } catch (e) {
-      alert("Copy failed");
-    }
+  const orderPayload = {
+    restaurantId,
+    createdAt: new Date().toISOString(),
+    items: Object.values(cart).map((it) => ({
+      id: it.id,
+      name: it.name,
+      price: it.price,
+      qty: it.qty,
+    })),
+    total: Object.values(cart).reduce((s, i) => s + i.price * i.qty, 0),
+    status: "pending", // Add a status for tracking
   };
+
+  try {
+    const docRef = await addDoc(collection(db, "orders"), orderPayload);
+    const orderId = docRef.id;
+    clearCart(); // Clear cart after placing order
+
+    const qrData = `order:${orderId}`;
+    // Get the element where the QR code will be displayed
+    const qrElement = document.getElementById('qrcode');
+
+    // // Define the data for the QR code
+    // const qrData = 'https://www.example.com'; // Replace with your desired URL or text
+
+    // Create a new QRCode instance
+    const qrcode = new QRCode(qrElement, {
+      text: qrData,
+      width: 128,
+      height: 128,
+      colorDark: '#000000', // Dark color for the QR code modules
+      colorLight: '#ffffff', // Light color for the background
+      correctLevel: QRCode.CorrectLevel.H // Error correction level (L, M, Q, H)
+    });
+
+    // If you need to generate a new QR code with different data later,
+    // you can use the makeCode method:
+    qrcode.makeCode('New QR code data');
+
+    // const qrPanel = document.getElementById("qrPanel");
+    // qrPanel.style.display = "block";
+    // qrPanel.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;align-items:center">
+    //                         <div id="qrCanvas"></div>
+    //                         <div style="color:var(--muted);word-break:break-all">Order ID: ${orderId}<div style="margin-top:6px"><button id="copyOrderId" class="btn secondary">Copy Order ID</button></div></div>
+    //                       </div>`;
+    // const canvasWrap = document.getElementById("qrCanvas");
+    // const canvas = document.createElement("canvas");
+    // console.log("window.QRCode before toCanvas:", window.QRCode);
+    // window.QRCode.toCanvas(canvas, qrData, { width: 160, margin: 2 }, () => {
+    //   canvasWrap.appendChild(canvas);
+    // });
+
+    // document.getElementById("copyOrderId").onclick = async () => {
+    //   try {
+    //     await navigator.clipboard.writeText(orderId);
+    //     alert("Order ID copied to clipboard");
+    //   } catch (e) {
+    //     alert("Copy failed");
+    //   }
+    // };
+  } catch (e) {
+    console.error("Error placing order: ", e);
+    alert("Failed to place order. Please try again.");
+  }
+}
+
+function updateWrapPadding() {
+  const orderSummary = document.getElementById("orderSummary");
+  const wrap = document.getElementById("wrap");
+  if (orderSummary && wrap) {
+    const summaryHeight = orderSummary.offsetHeight;
+    if (orderSummary.style.display !== 'none' && summaryHeight > 0) {
+      // Add a small buffer (e.g., 20px) to the summary height
+      wrap.style.paddingBottom = `${summaryHeight + 20}px`;
+    } else {
+      // Default padding when order summary is not visible
+      wrap.style.paddingBottom = '30px';
+    }
+  }
 }
 
 // wire footer buttons

@@ -7,24 +7,17 @@ const restaurantId = "demo-restaurant";
 const wrap = document.getElementById("wrap");
 // Import formatPrice from menu.js
 import { formatPrice } from './menu.js';
+import { db } from './firebase.js'; // Import the Firestore db instance
+import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+import { loadTemplate } from './templateLoader.js';
+import { menuStructure } from './menu.js';
 
 // (function(){
 
 // })();
 
-function showAdminLogin() {
-  wrap.innerHTML = `
-      <div style="background:#0b0b0b;padding:28px;border:3px solid #fff">
-        <h2 style="font-family:'Bebas Neue';font-size:30px;margin:0 0 12px 0">Admin Dashboard</h2>
-        <div style="color:var(--muted);margin-bottom:12px">Enter admin password to manage the menu.</div>
-        <input id="adminPass" type="password" placeholder="password" style="padding:8px 10px;border-radius:6px;border:1px solid #333;width:240px;margin-bottom:10px"/>
-        <div style="margin-top:8px">
-          <button id="adminEnter" class="btn">Enter</button>
-          <button id="backHome" class="btn secondary">Back</button>
-        </div>
-        <div style="margin-top:10px;color:var(--muted);font-size:0.86rem">Demo password is stored in the DB (admin123). Replace with real auth for production.</div>
-      </div>
-    `;
+async function showAdminLogin() {
+  wrap.innerHTML = await loadTemplate('./templates/admin-login.html');
   document.getElementById("backHome").onclick = () => {
     location.hash = "";
     location.reload();
@@ -54,12 +47,21 @@ export function showAdminPanel(restaurantId) {
   });
 }
 
-function renderAdmin(data) {
-  // Build simple admin UI but styled consistent with menu
+async function renderAdmin(data) {
+  wrap.innerHTML = await loadTemplate('./templates/admin.html');
+  document.getElementById('adminRestaurantName').innerText = `Admin — ${data.name}`;
+
+  const categoriesContainer = document.getElementById('adminCategories');
+  // const newItemCategorySelect = document.getElementById('newItemCategory');
+  let categoriesHtml = '';
+  // let categoryOptionsHtml = '<option value="">Select category</option>';
+
   const menu = data.menu || {};
-  let categoriesHtml = "";
-  Object.entries(menu).forEach(([key, section]) => {
-    const itemsHtml = Object.values(section.items)
+  menuStructure.forEach((key) => {
+    const section = menu[key]; // Get section data based on ordered key
+    if (!section) return; // Skip if section does not exist in data
+    
+    const itemsHtml = Array.from(section.items)
       .map((it) => {
         return `<div style="display:flex;justify-content:space-between;gap:12px;padding:10px;border-bottom:1px dashed rgba(255,255,255,0.04);align-items:center">
                   <div style="min-width:180px">
@@ -71,17 +73,13 @@ function renderAdmin(data) {
                     }
                   </div>
                   <div style="display:flex;gap:8px;align-items:center">
-                    <input type="number" min="0" step="0.01" value="${
-                      it.price
-                    }" data-section="${key}" data-id="${
-          it.id
-        }" class="priceInput" style="width:90px;padding:6px;border-radius:6px;border:1px solid #333;background:#0b0b0b;color:var(--text)"/>
-                    <button class="toggleAvailability btn secondary" data-section="${key}" data-id="${
-          it.id
-        }">${it.available ? "Available" : "Unavailable"}</button>
-                    <button class="deleteItem btn" data-section="${key}" data-id="${
-          it.id
-        }">Delete</button>
+                    <input type="number" min="0" step="1" value="${it.price
+          }" data-section="${key}" data-id="${it.id
+          }" class="priceInput" style="width:60px;padding:6px;border-radius:6px;border:1px solid #333;background:#0b0b0b;color:var(--text)"/>
+                    <button class="toggleAvailability btn secondary" data-section="${key}" data-id="${it.id
+          }">${it.available ? "Available" : "Unavailable"}</button>
+                    <button class="deleteItem btn" data-section="${key}" data-id="${it.id
+          }">Delete</button>
                   </div>
                 </div>`;
       })
@@ -89,105 +87,36 @@ function renderAdmin(data) {
 
     categoriesHtml += `<div style="margin-bottom:18px">
                           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-                            <h3 style="font-family:'Bebas Neue';font-size:20px;margin:0">${
-                              section.name
-                            }</h3>
+                            <h3 style="font-family:'Bebas Neue';font-size:20px;margin:0">${section.name
+      }</h3>
                             <button class="deleteCategory btn" data-cat="${key}">Delete Category</button>
                           </div>
-                          <div style="background:#0b0b0b;padding:10px;border:1px solid rgba(255,255,255,0.04)">${
-                            itemsHtml ||
-                            '<div style="color:var(--muted)">No items</div>'
-                          }</div>
+                          <div style="background:#0b0b0b;padding:10px;border:1px solid rgba(255,255,255,0.04)">${itemsHtml ||
+      '<div style="color:var(--muted)">No items</div>'
+      }</div>
                         </div>`;
+    // categoryOptionsHtml += `<option value="${key}">${section.name}</option>`;
   });
 
-  wrap.innerHTML = `
-      <div style="background:#000;padding:18px;border:3px solid #fff">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <h2 style="font-family:'Bebas Neue';font-size:28px;margin:0">Admin — ${
-              data.name
-            }</h2>
-            <div style="color:var(--muted);margin-top:6px">Manage availability, prices, categories and items. Changes are live.</div>
-          </div>
-          <div style="display:flex;gap:10px;align-items:center">
-            <a href="#/menu/demo-restaurant" class="btn">View Public Menu</a>
-            <button id="showQrLink" class="btn secondary">Show Menu Link</button>
-            <button id="logout" class="btn secondary">Logout</button>
-          </div>
-        </div>
-
-        <div style="margin-top:18px;display:grid;grid-template-columns:1fr 320px;gap:18px">
-          <div>
-            ${
-              categoriesHtml ||
-              '<div style="color:var(--muted)">No categories</div>'
-            }
-          </div>
-
-          <div style="background:#0b0b0b;padding:12px;border:1px solid rgba(255,255,255,0.04)">
-            <h4 style="font-family:\'Bebas Neue\';font-size:18px;margin:0 0 8px 0">Add Category</h4>
-            <input id="newCatName" placeholder="Category name" style="width:100%;padding:8px;border-radius:6px;border:1px solid #333;background:#000;color:#fff;margin-bottom:8px"/>
-            <button id="addCategory" class="btn">Add Category</button>
-
-            <hr style="opacity:.06;margin:12px 0"/>
-
-            <h4 style="font-family:\'Bebas Neue\';font-size:18px;margin:0 0 8px 0">Add Item</h4>
-            <input id="newItemName" placeholder="Item name" style="width:100%;padding:8px;border-radius:6px;border:1px solid #333;background:#000;color:#fff;margin-bottom:6px"/>
-            <input id="newItemDesc" placeholder="Description (optional)" style="width:100%;padding:8px;border-radius:6px;border:1px solid #333;background:#000;color:#fff;margin-bottom:6px"/>
-            <input id="newItemPrice" placeholder="Price" type="number" step="0.01" style="width:100%;padding:8px;border-radius:6px;border:1px solid #333;background:#000;color:#fff;margin-bottom:6px"/>
-            <select id="newItemCategory" style="width:100%;padding:8px;border-radius:6px;border:1px solid #333;background:#000;color:#fff;margin-bottom:6px">
-              <option value="">Select category</option>
-              ${Object.keys(data.menu)
-                .map(
-                  (k) => `<option value="${k}">${data.menu[k].name}</option>`
-                )
-                .join("")}
-            </select>
-            <button id="addItem" class="btn">Add Item</button>
-          </div>
-        </div>
-      </div>
-
-      <div style="background:#0b0b0b;padding:12px;border:1px solid rgba(255,255,255,0.04); margin-top: 18px;">
-        <h4 style="font-family:\'Bebas Neue\';font-size:18px;margin:0 0 8px 0">Scan Order QR</h4>
-        <input id="orderQrInput" placeholder="Paste QR link here" style="width:100%;padding:8px;border-radius:6px;border:1px solid #333;background:#000;color:#fff;margin-bottom:8px"/>
-        <button id="processOrder" class="btn">Process Order</button>
-        <div id="scannedOrderDetails" style="margin-top:10px;color:var(--muted);"></div>
-      </div>
-
-      <div id="menuLinkPanel" style="max-width:900px;margin-top:10px;display:none">
-        <div style="background:#111;padding:10px;border:1px solid rgba(255,255,255,0.04)">
-          <div style="margin-bottom:8px;color:var(--muted)">Public menu link:</div>
-          <div style="word-break:break-all;color:var(--muted)">${
-            location.origin + location.pathname
-          }#/menu/demo-restaurant</div>
-          <div style="margin-top:8px"><button id="copyMenuLink" class="btn">Copy link</button></div>
-        </div>
-      </div>
-    `;
+  categoriesContainer.innerHTML = categoriesHtml;
+  // newItemCategorySelect.innerHTML = categoryOptionsHtml;
 
   // wire events
   document.getElementById("logout").onclick = () => {
     location.hash = "";
     location.reload();
   };
-  document.getElementById("showQrLink").onclick = () => {
-    const panel = document.getElementById("menuLinkPanel");
-    panel.style.display = panel.style.display === "block" ? "none" : "block";
-    setTimeout(() => {
-      const btn = document.getElementById("copyMenuLink");
-      if (btn)
-        btn.onclick = async () => {
-          try {
-            await navigator.clipboard.writeText(
-              location.origin + location.pathname + "#/menu/demo-restaurant"
-            );
-            alert("Link copied");
-          } catch (e) {
-            alert("Copy failed");
-          }
-        };
+  document.getElementById("copyQrLink").onclick = () => {
+    setTimeout(async () => {
+      try {
+        await navigator.clipboard.writeText(
+          location.origin + location.pathname + "#/menu/demo-restaurant"
+        );
+        alert("Link copied");
+      } catch (e) {
+        alert("Copy failed");
+      }
+
     }, 50);
   };
 
@@ -203,7 +132,10 @@ function renderAdmin(data) {
       }
       // update DB
       const newMenu = JSON.parse(JSON.stringify(DB.data[restaurantId].menu));
-      newMenu[sec].items[id].price = val;
+      const itemToUpdate = newMenu[sec].items.find(item => item.id === id);
+      if (itemToUpdate) {
+        itemToUpdate.price = val;
+      }
       DB.updateDoc(restaurantId, { menu: newMenu });
     });
   });
@@ -214,12 +146,13 @@ function renderAdmin(data) {
       const sec = btn.dataset.section;
       const id = btn.dataset.id;
       const newMenu = JSON.parse(JSON.stringify(DB.data[restaurantId].menu));
-      newMenu[sec].items[id].available = !newMenu[sec].items[id].available;
+      const itemToUpdate = newMenu[sec].items.find(item => item.id === id);
+      if (itemToUpdate) {
+        itemToUpdate.available = !itemToUpdate.available;
+      }
       DB.updateDoc(restaurantId, { menu: newMenu });
     };
   });
-
-  document.getElementById("processOrder").onclick = processOrderQr;
 
   // delete item
   document.querySelectorAll(".deleteItem").forEach((btn) => {
@@ -228,7 +161,7 @@ function renderAdmin(data) {
       const sec = btn.dataset.section;
       const id = btn.dataset.id;
       const newMenu = JSON.parse(JSON.stringify(DB.data[restaurantId].menu));
-      delete newMenu[sec].items[id];
+      newMenu[sec].items = newMenu[sec].items.filter(item => item.id !== id);
       DB.updateDoc(restaurantId, { menu: newMenu });
     };
   });
@@ -245,58 +178,57 @@ function renderAdmin(data) {
   });
 
   // add category
-  const addCatBtn = document.getElementById("addCategory");
-  addCatBtn.onclick = () => {
-    const name = document.getElementById("newCatName").value.trim();
-    if (!name) return alert("Enter category name");
-    const id = name.toLowerCase().replace(/\s+/g, "-");
-    const newMenu = JSON.parse(JSON.stringify(DB.data[restaurantId].menu));
-    if (newMenu[id]) return alert("Category exists");
-    newMenu[id] = { name, items: {} };
-    DB.updateDoc(restaurantId, { menu: newMenu });
-    document.getElementById("newCatName").value = "";
-  };
+  // const addCatBtn = document.getElementById("addCategory");
+  // addCatBtn.onclick = () => {
+  //   const name = document.getElementById("newCatName").value.trim();
+  //   if (!name) return alert("Enter category name");
+  //   const id = name.toLowerCase().replace(/\s+/g, "-");
+  //   const newMenu = JSON.parse(JSON.stringify(DB.data[restaurantId].menu));
+  //   if (newMenu[id]) return alert("Category exists");
+  //   newMenu[id] = { name, items: [] };
+  //   DB.updateDoc(restaurantId, { menu: newMenu });
+  //   document.getElementById("newCatName").value = "";
+  // };
 
   // add item
-  document.getElementById("addItem").onclick = () => {
-    const name = document.getElementById("newItemName").value.trim();
-    const desc = document.getElementById("newItemDesc").value.trim();
-    const price = parseFloat(document.getElementById("newItemPrice").value);
-    const cat = document.getElementById("newItemCategory").value;
-    if (!name || isNaN(price) || !cat)
-      return alert("Fill name, price, category");
-    const id = name.toLowerCase().replace(/\s+/g, "-");
-    const newMenu = JSON.parse(JSON.stringify(DB.data[restaurantId].menu));
-    newMenu[cat].items[id] = { id, name, desc, price, available: true };
-    DB.updateDoc(restaurantId, { menu: newMenu });
-    document.getElementById("newItemName").value = "";
-    document.getElementById("newItemDesc").value = "";
-    document.getElementById("newItemPrice").value = "";
-    document.getElementById("newItemCategory").value = "";
-  };
+  // document.getElementById("addItem").onclick = () => {
+  //   const name = document.getElementById("newItemName").value.trim();
+  //   const desc = document.getElementById("newItemDesc").value.trim();
+  //   const price = parseFloat(document.getElementById("newItemPrice").value);
+  //   // const cat = document.getElementById("newItemCategory").value;
+  //   if (!name || isNaN(price) || !cat)
+  //     return alert("Fill name, price, category");
+  //   const id = name.toLowerCase().replace(/\s+/g, "-");
+  //   const newMenu = JSON.parse(JSON.stringify(DB.data[restaurantId].menu));
+  //   if (!newMenu[cat]) {
+  //     newMenu[cat] = { name: cat, items: [] }; // Initialize if category doesn't exist
+  //   }
+  //   newMenu[cat].items.push({ id, name, desc, price, available: true });
+  //   DB.updateDoc(restaurantId, { menu: newMenu });
+  //   document.getElementById("newItemName").value = "";
+  //   document.getElementById("newItemDesc").value = "";
+  //   document.getElementById("newItemPrice").value = "";
+  //   document.getElementById("newItemCategory").value = "";
+  // };
 } // renderAdmin
 
-function processOrderQr() {
-  const qrInput = document.getElementById("orderQrInput");
-  const orderDetailsDiv = document.getElementById("scannedOrderDetails");
-  const url = qrInput.value;
-  
-  if (!url) {
-    orderDetailsDiv.innerHTML = "Please enter a QR link.";
-    return;
-  }
-  
+async function fetchAndDisplayOrder(orderId, displayDiv) {
+  displayDiv.innerHTML = "Fetching order...";
   try {
-    const hash = url.split("#order=")[1];
-    if (!hash) {
-      throw new Error("Invalid order QR link.");
+    const orderDocRef = doc(db, "orders", orderId);
+    const orderDocSnap = await getDoc(orderDocRef);
+
+    if (!orderDocSnap.exists()) {
+      displayDiv.innerHTML = `<span style="color:red;">Order with ID \`${orderId}\` not found.</span>`;
+      return;
     }
-    const decoded = decodeURIComponent(atob(hash));
-    const order = JSON.parse(decoded);
-    
-    let orderHtml = `<h4>Order Details:</h4>
+
+    const order = orderDocSnap.data();
+
+    let orderHtml = `<h4>Order Details (ID: ${orderId}):</h4>
                      <p>Restaurant ID: ${order.restaurantId}</p>
                      <p>Created At: ${new Date(order.createdAt).toLocaleString()}</p>
+                     <p>Status: <span id="orderStatus">${order.status}</span></p>
                      <p>Total: $${formatPrice(order.total)}</p>
                      <h5>Items:</h5>
                      <ul>`;
@@ -304,9 +236,105 @@ function processOrderQr() {
       orderHtml += `<li>${item.name} (x${item.qty}) - $${formatPrice(item.price * item.qty)}</li>`;
     });
     orderHtml += `</ul>`;
-    orderDetailsDiv.innerHTML = orderHtml;
-    qrInput.value = ""; // Clear the input after processing
+
+    if (order.status === "pending") {
+      orderHtml += `<button id="markAsProcessed" class="btn green" data-order-id="${orderId}" style="margin-top:10px;">Mark as Processed</button>`;
+    }
+
+    displayDiv.innerHTML = orderHtml;
+
+    if (order.status === "pending") {
+      document.getElementById("markAsProcessed").onclick = async () => {
+        await updateDoc(orderDocRef, { status: "processed" });
+        alert("Order marked as processed!");
+        fetchAndDisplayOrder(orderId, displayDiv); // Re-fetch to update status display
+      };
+    }
   } catch (e) {
-    orderDetailsDiv.innerHTML = `<span style="color:red;">Error processing order: ${e.message}</span>`;
+    console.error("Error fetching order: ", e);
+    displayDiv.innerHTML = `<span style="color:red;">Error fetching order: ${e.message}</span>`;
   }
 }
+
+let html5QrCode = null;
+
+async function initQrScanner() {
+  const qrScannerDiv = document.getElementById('qrScanner');
+  const startScanBtn = document.getElementById('startQrScan');
+  const stopScanBtn = document.getElementById('stopQrScan');
+  const scannedOrderDetailsDiv = document.getElementById('scannedOrderDetails');
+  const tableNumberPromptDiv = document.getElementById('tableNumberPrompt');
+  const tableNumberInput = document.getElementById('tableNumberInput');
+  const assignTableBtn = document.getElementById('assignTable');
+
+  startScanBtn.onclick = () => {
+    qrScannerDiv.style.display = 'block';
+    startScanBtn.style.display = 'none';
+    stopScanBtn.style.display = 'inline-block';
+
+    html5QrCode = new Html5Qrcode("qrScanner");
+    html5QrCode.start(
+      { facingMode: "environment" },
+      (decodedText, decodedResult) => {
+        // on scan success
+        console.log(`QR Code detected: ${decodedText}`);
+        stopQrScanning();
+        
+        let orderId = decodedText;
+        if (decodedText.startsWith("order:")) {
+          orderId = decodedText.substring(6);
+        }
+
+        fetchAndDisplayOrder(orderId, scannedOrderDetailsDiv);
+
+        tableNumberPromptDiv.style.display = 'block';
+        assignTableBtn.onclick = async () => {
+          const tableNumber = tableNumberInput.value.trim();
+          if (!tableNumber) {
+            alert("Please enter a table number.");
+            return;
+          }
+
+          // Update order in Firestore with table number and status
+          const orderDocRef = doc(db, "orders", orderId);
+          await updateDoc(orderDocRef, { tableNumber: tableNumber, status: "received" });
+          alert(`Order ${orderId} assigned to table ${tableNumber} and marked as received!`);
+          tableNumberInput.value = '';
+          tableNumberPromptDiv.style.display = 'none';
+          fetchAndDisplayOrder(orderId, scannedOrderDetailsDiv); // Re-fetch to update display
+        };
+      },
+      (errorMessage) => {
+        // on error
+        console.warn(`QR Code scanning error: ${errorMessage}`);
+      }
+    ).catch((err) => {
+      console.error("Unable to start QR code scanner.", err);
+      scannedOrderDetailsDiv.innerHTML = `<span style="color:red;">Error starting scanner: ${err}</span>`;
+      stopQrScanning();
+    });
+  };
+
+  stopScanBtn.onclick = () => {
+    stopQrScanning();
+  };
+
+  function stopQrScanning() {
+    if (html5QrCode) {
+      html5QrCode.stop().then(() => {
+        qrScannerDiv.style.display = 'none';
+        startScanBtn.style.display = 'inline-block';
+        stopScanBtn.style.display = 'none';
+      }).catch((err) => {
+        console.error("Error stopping QR scanner", err);
+      });
+    }
+  }
+}
+
+// Call initQrScanner when the admin panel is rendered
+const originalRenderAdmin = renderAdmin;
+renderAdmin = async (data) => {
+  await originalRenderAdmin(data);
+  initQrScanner();
+};

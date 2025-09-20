@@ -18,7 +18,7 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+export const db = getFirestore(app);
 
 class FirestoreDB {
   constructor() {
@@ -70,224 +70,224 @@ const initialDemoData = {
   menu: {
     starters: {
       name: "STARTERS",
-      layout: "left",
-      items: {
-        "greek-salad": {
+      layout: "left", // alignment hint
+      items: [
+        {
           id: "greek-salad",
           name: "GREEK SALAD",
           desc: "Lorem ipsum dolor sit amet, sit audire recusabo complectitur eu.",
           price: 5.0,
           available: true,
         },
-        "tortilla-espanola": {
+        {
           id: "tortilla-espanola",
           name: "TORTILLA ESPAÑOLA",
           desc: "Pelletusque nece nulla non urna faucibus maximus in sed tellus.",
           price: 4.5,
           available: true,
         },
-        "olivas-rellenas": {
+        {
           id: "olivas-rellenas",
           name: "OLIVAS RELLENAS",
           desc: "Audire recusabo complectitur eu.",
           price: 6.0,
           available: true,
         },
-        "verduras-con-olivada": {
+        {
           id: "verduras-con-olivada",
           name: "VERDURAS CON OLIVADA",
           desc: "Pellentesque neque nulla non urna faucibus.",
           price: 6.5,
           available: true,
         },
-        lasagne: {
+        {
           id: "lasagne",
           name: "LASAGNE",
           desc: "Pellentesque neque nulla non urna faucibus maximus in sed tellus.",
           price: 3.0,
           available: true,
         },
-      },
+      ],
     },
     mains: {
       name: "MAINS",
       layout: "right",
-      items: {
-        lenguado: {
+      items: [
+        {
           id: "lenguado",
           name: "LENGUADO",
           desc: "Lorem ipsum dolor sit amet.",
           price: 12.0,
           available: true,
         },
-        "bacalao-frito": {
+        {
           id: "bacalao-frito",
           name: "BACALAO FRITO",
           desc: "Lorem ipsum dolor sit amet.",
           price: 7.0,
           available: true,
         },
-        "paella-mixta": {
+        {
           id: "paella-mixta",
           name: "PAELLA MIXTA",
           desc: "Lorem ipsum dolor sit amet.",
           price: 8.5,
           available: true,
         },
-        "lomo-de-salmon": {
+        {
           id: "lomo-de-salmon",
           name: "LOMO DE SALMÓN",
           desc: "Lorem ipsum dolor sit amet.",
           price: 11.5,
           available: true,
         },
-        "pollo-al-horno": {
+        {
           id: "pollo-al-horno",
           name: "POLLO AL HORNO",
           desc: "Lorem ipsum dolor sit amet.",
           price: 8.0,
           available: true,
         },
-      },
+      ],
     },
     sides: {
       name: "SIDES",
       layout: "left",
-      items: {
-        fries: {
+      items: [
+        {
           id: "fries",
           name: "FRIES",
           price: 2.0,
           available: true,
         },
-        "pepper-potatoes": {
+        {
           id: "pepper-potatoes",
           name: "PEPPER POTATOES",
           price: 2.0,
           available: true,
         },
-        "green-salad": {
+        {
           id: "green-salad",
           name: "GREEN SALAD",
           price: 2.0,
           available: true,
         },
-        coleslaw: {
+        {
           id: "coleslaw",
           name: "COLESLAW",
           price: 2.0,
           available: true,
         },
-        "jackpot-potato": {
+        {
           id: "jackpot-potato",
           name: "JACKET POTATO",
           price: 3.0,
           available: true,
         },
-        "onion-rings": {
+        {
           id: "onion-rings",
           name: "ONION RINGS",
           price: 3.0,
           available: true,
         },
-        "fried-beans": {
+        {
           id: "fried-beans",
           name: "FRIED BEANS",
           price: 3.0,
           available: true,
         },
-      },
+      ],
     },
     desserts: {
       name: "DESSERTS",
       layout: "left",
-      items: {
-        "banana-split": {
+      items: [
+        {
           id: "banana-split",
           name: "BANANA SPLIT",
           price: 9.0,
           available: true,
         },
-        "cherry-pie": {
+        {
           id: "cherry-pie",
           name: "CHERRY PIE",
           price: 2.0,
           available: true,
         },
-        "choco-budor": {
+        {
           id: "choco-budor",
           name: "CHOCO BUDOR",
           price: 2.0,
           available: true,
         },
-        "cookie-delight": {
+        {
           id: "cookie-delight",
           name: "COOKIE DELIGHT",
           price: 2.0,
           available: true,
         },
-        "apple-pie": {
+        {
           id: "apple-pie",
           name: "APPLE PIE",
           price: 3.0,
           available: true,
         },
-        "fruit-smoothie": {
+        {
           id: "fruit-smoothie",
           name: "FRUIT SMOOTHIE",
           price: 2.0,
           available: true,
         },
-        "chocolate-muffin": {
+        {
           id: "chocolate-muffin",
           name: "CHOCOLATE MUFFIN",
           price: 1.5,
           available: true,
         },
-      },
+      ],
     },
     drinks: {
       name: "DRINKS",
       layout: "right",
-      items: {
-        "soft-drinks": {
+      items: [
+        {
           id: "soft-drinks",
           name: "SOFT DRINKS",
           price: 1.75,
           available: true,
         },
-        beer: { id: "beer", name: "BEER", price: 2.0, available: true },
-        "glass-of-wine": {
+        { id: "beer", name: "BEER", price: 2.0, available: true },
+        {
           id: "glass-of-wine",
           name: "GLASS OF WINE",
           price: 2.0,
           available: true,
         },
-        cider: {
+        {
           id: "cider",
           name: "CIDER",
           price: 2.0,
           available: true,
         },
-        "bottled-water": {
+        {
           id: "bottled-water",
           name: "BOTTLED WATER",
           price: 1.5,
           available: true,
         },
-        "fresh-juice": {
+        {
           id: "fresh-juice",
           name: "FRESH JUICE",
           price: 3.0,
           available: true,
         },
-        "tea-or-coffee": {
+        {
           id: "tea-or-coffee",
           name: "TEA or COFFEE",
           price: 1.5,
           available: true,
         },
-      },
+      ],
     },
   },
 };
